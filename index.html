@@ -407,7 +407,8 @@ async function createGame() {
 
   showScreen('host-lobby');
   document.getElementById('lobby-code').textContent = roomCode;
-  _joinUrl = `${location.origin}${location.pathname}?join=${roomCode}`;
+  const _basePath = location.origin + location.pathname.replace(/index\.html$/, '');
+  _joinUrl = `${_basePath}?join=${roomCode}`;
   document.getElementById('lobby-url').textContent = '📋 ' + _joinUrl + '  (tap to copy)';
   generateQR(_joinUrl);
 
@@ -761,7 +762,7 @@ function renderRows(id,sorted){
 async function generateQuestions(topic, count) {
   const r=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{'Content-Type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
     body:JSON.stringify({
       model:'claude-sonnet-4-6',
       max_tokens:2000,
@@ -805,16 +806,31 @@ function generateQR(url) {
 // BOOT
 // ════════════════════════════════════════════════════════════════
 (function boot(){
+  // Always check for ?join= param first and stash it
+  const params = new URLSearchParams(location.search);
+  const pendingJoin = params.get('join');
+  if (pendingJoin) sessionStorage.setItem('qb_pending_join', pendingJoin);
+
   if(DB){ init(); } else { showScreen('config-screen'); }
 })();
 
 function init(){
-  showScreen('landing');
-  const params=new URLSearchParams(location.search);
-  const code=params.get('join');
-  if(code){
+  // Check for a pending join code (from QR scan or shared link)
+  const pendingJoin = sessionStorage.getItem('qb_pending_join');
+  if (pendingJoin) {
+    sessionStorage.removeItem('qb_pending_join');
     showScreen('join-screen');
-    document.getElementById('join-code').value=code;
+    document.getElementById('join-code').value = pendingJoin;
+    return;
+  }
+  // Otherwise check the URL directly
+  const params = new URLSearchParams(location.search);
+  const code = params.get('join');
+  if (code) {
+    showScreen('join-screen');
+    document.getElementById('join-code').value = code;
+  } else {
+    showScreen('landing');
   }
 }
 </script>
