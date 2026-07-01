@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>QuizBlitz — Live Multiplayer Quiz</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy:#0D0F1C; --navy2:#161929; --purple:#7C3AED; --purple-light:#A78BFA;
+    --yellow:#FFD600; --green:#22C55E; --red:#EF4444; --white:#F8F8FF;
+    --muted:#8892B0; --card:#1A1D2E; --border:#2A2D3E;
+  }
+  html,body{height:100%;background:var(--navy);color:var(--white);font-family:'Space Grotesk',sans-serif;overflow-x:hidden}
+  .screen{display:none;min-height:100vh;padding:20px;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+  .screen.active{display:flex}
+  .logo{font-size:clamp(2.5rem,8vw,4.5rem);font-weight:800;letter-spacing:-2px}
+  .logo span{color:var(--yellow)}
+  .tagline{color:var(--muted);font-size:1.05rem}
+  .btn{padding:15px 26px;border:none;border-radius:12px;font-family:inherit;font-size:1rem;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.3px;width:100%}
+  .btn-yellow{background:var(--yellow);color:var(--navy)}
+  .btn-yellow:hover{background:#e6c200;transform:translateY(-2px);box-shadow:0 8px 20px rgba(255,214,0,.3)}
+  .btn-purple{background:var(--purple);color:#fff}
+  .btn-purple:hover{background:#6D28D9;transform:translateY(-2px);box-shadow:0 8px 20px rgba(124,58,237,.4)}
+  .btn-ghost{background:var(--card);color:var(--white);border:2px solid var(--border)}
+  .btn-ghost:hover{border-color:var(--purple-light);transform:translateY(-2px)}
+  .btn-sm{padding:10px 18px;font-size:.85rem;border-radius:8px;width:auto}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+  .row{display:flex;gap:12px;width:100%}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:26px;width:100%;max-width:420px;display:flex;flex-direction:column;gap:18px}
+  .card h2{font-size:1.35rem;font-weight:800}
+  .field{display:flex;flex-direction:column;gap:6px}
+  label{font-size:.82rem;color:var(--muted);font-weight:500}
+  input[type=text],select{width:100%;padding:13px 15px;background:var(--navy);border:2px solid var(--border);border-radius:10px;color:var(--white);font-family:inherit;font-size:1rem;outline:none;transition:border-color .15s}
+  input:focus,select:focus{border-color:var(--purple)}
+  select option{background:var(--navy)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  /* SETUP SCREEN */
+  #setup-screen{background:var(--navy2);border-radius:20px;padding:30px;max-width:520px;width:100%;border:1px solid var(--border)}
+  .setup-step{display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--border)}
+  .setup-step:last-child{border-bottom:none;padding-bottom:0}
+  .step-num{width:32px;height:32px;border-radius:50%;background:var(--purple);color:#fff;font-weight:800;font-size:.9rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+  .step-body h4{font-size:1rem;font-weight:700;margin-bottom:4px}
+  .step-body p{font-size:.82rem;color:var(--muted);line-height:1.5}
+  .step-body a{color:var(--purple-light);text-decoration:none}
+  .step-body a:hover{text-decoration:underline}
+  .db-field{display:flex;gap:8px;margin-top:10px}
+  .db-field input{flex:1;font-family:'Space Mono',monospace;font-size:.8rem}
+  /* LOBBY */
+  .code-big{font-family:'Space Mono',monospace;font-size:clamp(3.5rem,16vw,6.5rem);font-weight:700;color:var(--yellow);letter-spacing:14px;text-shadow:0 0 40px rgba(255,214,0,.3);line-height:1}
+  .room-label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:3px}
+  .url-pill{background:var(--navy2);border:2px dashed var(--border);border-radius:12px;padding:12px 16px;font-family:'Space Mono',monospace;font-size:.7rem;color:var(--purple-light);word-break:break-all;text-align:center;cursor:pointer;max-width:500px;width:100%;transition:border-color .15s}
+  .url-pill:hover{border-color:var(--purple)}
+  .player-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;max-width:500px;width:100%}
+  .player-box h3{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:12px}
+  .chip{display:inline-flex;align-items:center;gap:7px;background:var(--navy2);border:1px solid var(--border);border-radius:50px;padding:7px 13px;margin:3px;font-size:.88rem;font-weight:600}
+  .chip::before{content:'●';color:var(--green);font-size:.55rem}
+  .empty-msg{color:var(--muted);font-size:.88rem;text-align:center;padding:12px 0}
+  /* QUESTION */
+  .q-wrap{width:100%;max-width:620px;display:flex;flex-direction:column;gap:18px}
+  .q-meta{display:flex;justify-content:space-between;align-items:center}
+  .q-label{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:2px;font-weight:700}
+  .q-timer{font-family:'Space Mono',monospace;font-size:1.7rem;font-weight:700;color:var(--yellow)}
+  .q-timer.hot{color:var(--red);animation:blink .5s infinite alternate}
+  @keyframes blink{from{opacity:1}to{opacity:.4}}
+  .pbar{width:100%;height:4px;background:var(--border);border-radius:4px;overflow:hidden}
+  .pfill{height:100%;background:var(--purple);border-radius:4px;transition:width 1s linear}
+  .q-text{font-size:clamp(1.05rem,3.5vw,1.4rem);font-weight:700;line-height:1.45;text-align:center;padding:22px;background:var(--card);border-radius:16px;border:1px solid var(--border)}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .opt{padding:17px 13px;border-radius:12px;border:2px solid var(--border);background:var(--card);color:var(--white);font-family:inherit;font-size:clamp(.82rem,2.8vw,.98rem);font-weight:600;cursor:pointer;transition:all .15s;text-align:center;line-height:1.3}
+  .opt:hover:not(:disabled){border-color:var(--purple);background:rgba(124,58,237,.15);transform:translateY(-2px)}
+  .opt.picked{border-color:var(--purple);background:rgba(124,58,237,.25)}
+  .opt.correct{border-color:var(--green)!important;background:rgba(34,197,94,.2)!important;color:var(--green)!important}
+  .opt.wrong{border-color:var(--red)!important;background:rgba(239,68,68,.15)!important;color:var(--red)!important}
+  .opt:disabled{cursor:default}
+  .opt-letter{display:block;font-size:.65rem;color:var(--muted);margin-bottom:3px;font-family:'Space Mono',monospace}
+  .reveal-bar{font-size:.88rem;color:var(--muted);text-align:center}
+  .reveal-bar strong{color:var(--green)}
+  .feedback{text-align:center;font-size:1.05rem;font-weight:700;padding:14px;border-radius:12px}
+  .fb-wait{background:rgba(167,139,250,.1);color:var(--purple-light);border:1px solid rgba(167,139,250,.25)}
+  .fb-ok{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+  .fb-bad{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+  .fb-timeout{background:rgba(255,214,0,.1);color:var(--yellow);border:1px solid rgba(255,214,0,.3)}
+  /* SCOREBOARD */
+  .scores{width:100%;max-width:500px;display:flex;flex-direction:column;gap:9px}
+  .s-row{display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px 17px}
+  .s-row.me{border-color:var(--purple);background:rgba(124,58,237,.1)}
+  .s-rank{font-family:'Space Mono',monospace;font-size:1.05rem;font-weight:700;color:var(--muted);min-width:26px}
+  .s-rank.g{color:var(--yellow)} .s-rank.s{color:#CBD5E1} .s-rank.b{color:#CD7C44}
+  .s-name{flex:1;font-weight:700}
+  .s-pts{font-family:'Space Mono',monospace;font-weight:700;color:var(--purple-light)}
+  /* MISC */
+  .muted{color:var(--muted);font-size:.9rem;text-align:center}
+  .h1big{font-size:clamp(1.6rem,6vw,2.4rem);font-weight:800;text-align:center}
+  .spinner{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .emoji-big{font-size:3.8rem}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px 18px;font-size:.88rem;font-weight:600;z-index:200;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;max-width:90vw}
+  .toast.show{opacity:1}
+  @media(max-width:400px){.opts,.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+
+<!-- ════════ SETUP / CONFIG ════════ -->
+<div class="screen active" id="config-screen">
+  <div class="logo" style="text-align:center">Quiz<span>Blitz</span></div>
+  <div id="setup-screen">
+    <h2 style="font-size:1.2rem;font-weight:800;margin-bottom:4px">⚙️ One-time Setup</h2>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:8px">QuizBlitz needs a free Firebase database to sync players in real time. Takes about 2 minutes.</p>
+
+    <div class="setup-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h4>Create a free Firebase project</h4>
+        <p>Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → <strong>Add project</strong> → name it anything (e.g. "quizblitz") → continue through the steps (disable Analytics if you like).</p>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h4>Add a Realtime Database</h4>
+        <p>In your project: <strong>Build → Realtime Database → Create database</strong>. Choose any region. When asked for rules, select <strong>"Start in test mode"</strong> (allows open read/write — fine for a game).</p>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h4>Paste your database URL below</h4>
+        <p>It looks like: <code style="color:var(--purple-light)">https://your-project-default-rtdb.firebaseio.com</code><br>Find it at the top of the Realtime Database page.</p>
+        <div class="db-field">
+          <input type="text" id="db-url-input" placeholder="https://your-project-default-rtdb.firebaseio.com" spellcheck="false">
+          <button class="btn btn-purple btn-sm" onclick="saveDbUrl()">Save →</button>
+        </div>
+        <p id="db-test-msg" style="margin-top:8px;font-size:.8rem"></p>
+      </div>
+    </div>
+  </div>
+  <p class="muted" style="font-size:.75rem;max-width:420px;text-align:center">Your Firebase URL is saved in your browser. You only need to do this once — it'll be remembered next time you open this file.</p>
+</div>
+
+<!-- ════════ LANDING ════════ -->
+<div class="screen" id="landing">
+  <div class="logo" style="text-align:center">Quiz<span>Blitz</span></div>
+  <p class="muted" style="margin-top:-8px">Live multiplayer · Any device · Any network</p>
+  <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px;margin-top:8px">
+    <button class="btn btn-yellow" onclick="showScreen('host-setup')">🎮 Host a Game</button>
+    <button class="btn btn-ghost" onclick="showScreen('join-screen')">📱 Join a Game</button>
+  </div>
+  <button onclick="resetConfig()" style="background:none;border:none;color:var(--muted);font-size:.75rem;cursor:pointer;margin-top:12px;font-family:inherit">⚙️ Change database</button>
+</div>
+
+<!-- ════════ HOST SETUP ════════ -->
+<div class="screen" id="host-setup">
+  <div class="card">
+    <h2>🎮 Host a Game</h2>
+    <div class="field">
+      <label>Your name</label>
+      <input type="text" id="host-name" placeholder="e.g. Dave" maxlength="20">
+    </div>
+    <div class="field">
+      <label>Quiz topic</label>
+      <input type="text" id="quiz-topic" placeholder="e.g. 90s pop music, Premier League…" maxlength="60">
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label>Questions</label>
+        <select id="num-q"><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option></select>
+      </div>
+      <div class="field">
+        <label>Time per Q</label>
+        <select id="time-q"><option value="15">15 sec</option><option value="20" selected>20 sec</option><option value="30">30 sec</option><option value="45">45 sec</option></select>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="showScreen('landing')">← Back</button>
+      <button class="btn btn-yellow" onclick="createGame()">Create →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ JOIN ════════ -->
+<div class="screen" id="join-screen">
+  <div class="card">
+    <h2>📱 Join a Game</h2>
+    <div class="field">
+      <label>Your name</label>
+      <input type="text" id="player-name" placeholder="e.g. Sarah" maxlength="20">
+    </div>
+    <div class="field">
+      <label>Room code</label>
+      <input type="text" id="join-code" placeholder="4827" maxlength="4" inputmode="numeric"
+        style="font-family:'Space Mono',monospace;font-size:2rem;letter-spacing:10px;text-align:center"
+        oninput="this.value=this.value.replace(/\D/g,'').slice(0,4)">
+    </div>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="showScreen('landing')">← Back</button>
+      <button class="btn btn-purple" onclick="joinGame()">Join →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ HOST LOBBY ════════ -->
+<div class="screen" id="host-lobby">
+  <p class="room-label">Room Code — share with players!</p>
+  <div class="code-big" id="lobby-code">----</div>
+  <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;justify-content:center;width:100%;max-width:500px">
+    <div style="background:#fff;border-radius:16px;padding:10px;display:inline-block;flex-shrink:0">
+      <canvas id="qr-canvas" width="140" height="140"></canvas>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;flex:1;min-width:180px">
+      <div class="url-pill" id="lobby-url" onclick="copyUrl()" style="font-size:.68rem">📋 Loading…</div>
+      <p style="font-size:.75rem;color:var(--muted);text-align:center;line-height:1.4">Players scan the QR or type the room code</p>
+    </div>
+  </div>
+  <div class="player-box">
+    <h3>Players joined (<span id="p-count">0</span>)</h3>
+    <div id="p-chips"><p class="empty-msg">No one yet — share the code!</p></div>
+  </div>
+  <button class="btn btn-yellow" id="start-btn" onclick="startGame()" disabled style="max-width:500px">Waiting…</button>
+  <p class="muted" id="gen-status" style="min-height:1.2em;font-size:.85rem"></p>
+  <button class="btn btn-ghost btn-sm" onclick="cancelGame()">Cancel</button>
+</div>
+
+<!-- ════════ PLAYER LOBBY ════════ -->
+<div class="screen" id="player-lobby">
+  <div class="emoji-big">🎉</div>
+  <h1 class="h1big">You're in!</h1>
+  <p class="muted" id="pl-msg">Waiting for the host to start…</p>
+  <div class="spinner"></div>
+  <p class="muted" id="pl-code" style="font-family:'Space Mono',monospace;font-size:.9rem"></p>
+</div>
+
+<!-- ════════ HOST QUESTION ════════ -->
+<div class="screen" id="host-q">
+  <div class="q-wrap">
+    <div class="q-meta">
+      <span class="q-label" id="hq-num">Q 1 / 10</span>
+      <span class="q-timer" id="hq-timer">20</span>
+    </div>
+    <div class="pbar"><div class="pfill" id="hq-pfill" style="width:100%"></div></div>
+    <div class="q-text" id="hq-text">Loading…</div>
+    <div class="opts" id="hq-opts"></div>
+    <div class="reveal-bar" id="hq-reveal" style="display:none"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="muted" id="hq-count" style="font-size:.82rem"></span>
+      <button class="btn btn-purple btn-sm" id="hq-next" onclick="hostNext()" style="display:none">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ PLAYER QUESTION ════════ -->
+<div class="screen" id="player-q">
+  <div class="q-wrap">
+    <div class="q-meta">
+      <span class="q-label" id="pq-num">Q 1 / 10</span>
+      <span class="q-timer" id="pq-timer">20</span>
+    </div>
+    <div class="pbar"><div class="pfill" id="pq-pfill" style="width:100%"></div></div>
+    <div class="q-text" id="pq-text">Loading…</div>
+    <div class="opts" id="pq-opts"></div>
+    <div class="feedback" id="pq-fb" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ════════ SCOREBOARD ════════ -->
+<div class="screen" id="sb-screen">
+  <h1 class="h1big" id="sb-title">Scoreboard</h1>
+  <p class="muted" id="sb-sub"></p>
+  <div class="scores" id="sb-rows"></div>
+  <div id="sb-host-ctrl" style="display:none">
+    <button class="btn btn-yellow btn-sm" onclick="sbContinue()">Continue →</button>
+  </div>
+  <p class="muted" id="sb-wait" style="display:none">⏳ Waiting for host…</p>
+</div>
+
+<!-- ════════ FINAL ════════ -->
+<div class="screen" id="final-screen">
+  <div class="emoji-big" id="fin-emoji">🏆</div>
+  <h1 class="h1big" id="fin-title">Game Over!</h1>
+  <p class="muted" id="fin-msg"></p>
+  <div class="scores" id="fin-rows"></div>
+  <button class="btn btn-yellow" onclick="showScreen('landing')" style="max-width:320px;margin-top:8px">Play Again</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════
+// CONFIG — Firebase Realtime Database URL stored in localStorage
+// ════════════════════════════════════════════════════════════════
+const CONFIG_KEY = 'qb_db_url';
+let DB = localStorage.getItem(CONFIG_KEY) || '';
+
+function saveDbUrl() {
+  const val = document.getElementById('db-url-input').value.trim().replace(/\/$/, '');
+  if (!val.startsWith('https://') || !val.includes('firebasedatabase')) {
+    setTestMsg('❌ URL should look like: https://your-project-default-rtdb.firebaseio.com', 'var(--red)');
+    return;
+  }
+  DB = val;
+  localStorage.setItem(CONFIG_KEY, DB);
+  setTestMsg('✅ Saved! Taking you to the game…', 'var(--green)');
+  setTimeout(() => init(), 600);
+}
+
+function setTestMsg(msg, color) {
+  const el = document.getElementById('db-test-msg');
+  el.textContent = msg;
+  el.style.color = color;
+}
+
+function resetConfig() {
+  localStorage.removeItem(CONFIG_KEY);
+  DB = '';
+  showScreen('config-screen');
+}
+
+// ════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════
+let role=null, roomCode=null, myName=null;
+let gameSettings={}, questions=[], currentQ=0;
+let timerInterval=null, timeLeft=0;
+let myAnswer=null, hasAnswered=false, gamePhase='';
+let _nextQIdx=0, _questionsReady=false, _playerCount=0;
+let _joinUrl='', _settingsSSE=null, _answersSSE=null;
+let _lastPhase='', _lastQIdx=-1, _cachedAnswers={};
+
+// ════════════════════════════════════════════════════════════════
+// FIREBASE REST
+// ════════════════════════════════════════════════════════════════
+const fb = {
+  async get(path) {
+    try { const r=await fetch(`${DB}/${path}.json`); return r.ok ? r.json() : null; } catch { return null; }
+  },
+  async set(path, data) {
+    try { await fetch(`${DB}/${path}.json`,{method:'PUT',body:JSON.stringify(data)}); return true; } catch { return false; }
+  },
+  async patch(path, data) {
+    try { await fetch(`${DB}/${path}.json`,{method:'PATCH',body:JSON.stringify(data)}); return true; } catch { return false; }
+  },
+  async del(path) {
+    try { await fetch(`${DB}/${path}.json`,{method:'DELETE'}); } catch {}
+  },
+  listen(path, cb) {
+    const es = new EventSource(`${DB}/${path}.json`);
+    es.addEventListener('put',   e => { try { cb(JSON.parse(e.data)?.data); } catch {} });
+    es.addEventListener('patch', e => { try { cb(JSON.parse(e.data)?.data, true); } catch {} });
+    es.onerror = () => {};
+    return es;
+  }
+};
+
+function stopSSE() {
+  [_settingsSSE, _answersSSE].forEach(s => { if(s) try{s.close()}catch{} });
+  _settingsSSE = _answersSSE = null;
+}
+
+// ════════════════════════════════════════════════════════════════
+// UI
+// ════════════════════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function toast(msg, ms=2500) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), ms);
+}
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const key = n => n.replace(/[.#$\/\[\]\s]/g,'_');
+const unkey = (k, nameMap) => nameMap[k] || k;
+function genCode() { return String(Math.floor(1000+Math.random()*9000)); }
+function disableOpts(id) { document.getElementById(id).querySelectorAll('.opt').forEach(b=>b.disabled=true); }
+
+// ════════════════════════════════════════════════════════════════
+// HOST: CREATE GAME
+// ════════════════════════════════════════════════════════════════
+async function createGame() {
+  const name  = document.getElementById('host-name').value.trim();
+  const topic = document.getElementById('quiz-topic').value.trim();
+  if (!name)  { toast('Enter your name!'); return; }
+  if (!topic) { toast('Enter a quiz topic!'); return; }
+
+  myName=name; role='host'; roomCode=genCode();
+  _questionsReady=false; _playerCount=0;
+
+  gameSettings = {
+    topic, host:name,
+    numQuestions: +document.getElementById('num-q').value,
+    timePerQ:     +document.getElementById('time-q').value,
+    phase:'lobby', currentQ:0, started:false
+  };
+
+  await fb.set(`rooms/${roomCode}`, {
+    settings:  gameSettings,
+    players:   { [key(name)]: {name, score:0, isHost:true} },
+    answers:   {},
+    scores:    {},
+    createdAt: Date.now()
+  });
+
+  showScreen('host-lobby');
+  document.getElementById('lobby-code').textContent = roomCode;
+  _joinUrl = `${location.origin}${location.pathname}?join=${roomCode}`;
+  document.getElementById('lobby-url').textContent = '📋 ' + _joinUrl + '  (tap to copy)';
+  generateQR(_joinUrl);
+
+  // Generate questions
+  document.getElementById('gen-status').textContent = '⚡ Generating questions with AI…';
+  generateQuestions(topic, gameSettings.numQuestions)
+    .then(async qs => {
+      questions = qs;
+      await fb.set(`rooms/${roomCode}/questions`, qs);
+      _questionsReady = true;
+      document.getElementById('gen-status').textContent = `✅ ${qs.length} questions ready!`;
+      updateStartBtn();
+    })
+    .catch(e => {
+      console.error(e);
+      document.getElementById('gen-status').textContent = '❌ Failed to generate questions. Refresh and retry.';
+    });
+
+  // Live players list
+  _settingsSSE = fb.listen(`rooms/${roomCode}/players`, data => {
+    if (!data) return;
+    const nonHost = Object.values(data).filter(p=>!p.isHost);
+    _playerCount = nonHost.length;
+    document.getElementById('p-count').textContent = nonHost.length;
+    document.getElementById('p-chips').innerHTML = nonHost.length===0
+      ? '<p class="empty-msg">No one yet — share the code!</p>'
+      : nonHost.map(p=>`<span class="chip">${esc(p.name)}</span>`).join('');
+    updateStartBtn();
+  });
+}
+
+function updateStartBtn() {
+  const btn = document.getElementById('start-btn');
+  if (!_questionsReady)   { btn.disabled=true; btn.textContent='Generating questions…'; }
+  else if (_playerCount<1){ btn.disabled=true; btn.textContent='Waiting for players to join…'; }
+  else                    { btn.disabled=false; btn.textContent=`▶  Start Game  (${_playerCount} player${_playerCount>1?'s':''} ready)`; }
+}
+
+function copyUrl() {
+  navigator.clipboard.writeText(_joinUrl)
+    .then(()=>toast('📋 Link copied! Send it to your players.'))
+    .catch(()=>{ prompt('Copy this link:', _joinUrl); });
+}
+
+async function cancelGame() {
+  stopSSE(); clearInterval(timerInterval);
+  if (roomCode) await fb.del(`rooms/${roomCode}`);
+  showScreen('landing');
+}
+
+// ════════════════════════════════════════════════════════════════
+// PLAYER: JOIN
+// ════════════════════════════════════════════════════════════════
+async function joinGame() {
+  const name = document.getElementById('player-name').value.trim();
+  const code = document.getElementById('join-code').value.trim();
+  if (!name)         { toast('Enter your name!'); return; }
+  if (code.length!==4){ toast('Enter the 4-digit room code!'); return; }
+
+  const room = await fb.get(`rooms/${code}`);
+  if (!room)                   { toast('Room not found — check the code!'); return; }
+  if (room.settings?.started)  { toast('That game has already started!'); return; }
+  if (room.players?.[key(name)]){ toast('That name is already taken in this room!'); return; }
+
+  myName=name; role='player'; roomCode=code;
+  gameSettings = room.settings;
+  questions    = room.questions || [];
+
+  await fb.patch(`rooms/${code}/players`, {
+    [key(name)]: {name, score:0, isHost:false}
+  });
+
+  showScreen('player-lobby');
+  document.getElementById('pl-msg').textContent  = `Joined "${gameSettings.topic}" — waiting for host…`;
+  document.getElementById('pl-code').textContent = `Room: ${code}`;
+
+  _lastPhase='lobby'; _lastQIdx=-1;
+  listenForGameState();
+}
+
+function listenForGameState() {
+  stopSSE();
+  _settingsSSE = fb.listen(`rooms/${roomCode}/settings`, data => {
+    if (!data) return;
+    gameSettings = data;
+    const { phase, currentQ:qIdx } = data;
+
+    if (phase==='question' && (qIdx!==_lastQIdx || _lastPhase!=='question')) {
+      _lastQIdx=qIdx; _lastPhase='question';
+      stopSSE();
+      if (!questions[qIdx]) {
+        fb.get(`rooms/${roomCode}/questions`).then(qs=>{
+          if (qs) questions=qs;
+          showPlayerQ(qIdx);
+        });
+      } else {
+        showPlayerQ(qIdx);
+      }
+    } else if (phase==='reveal' && _lastPhase==='question') {
+      _lastPhase='reveal';
+      revealPlayer();
+    } else if (phase==='scoreboard' && _lastPhase!=='scoreboard') {
+      _lastPhase='scoreboard';
+      stopSSE();
+      showSB(false).then(listenForGameState);
+    } else if (phase==='final' && _lastPhase!=='final') {
+      _lastPhase='final';
+      stopSSE();
+      showFinal();
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// START (HOST)
+// ════════════════════════════════════════════════════════════════
+async function startGame() {
+  stopSSE(); clearInterval(timerInterval);
+  gameSettings.started=true; gameSettings.phase='question'; gameSettings.currentQ=0;
+
+  const players = await fb.get(`rooms/${roomCode}/players`) || {};
+  const scores  = {};
+  Object.values(players).forEach(p => scores[key(p.name)]=0);
+
+  await fb.patch(`rooms/${roomCode}`, {settings:gameSettings, scores, answers:{}});
+  questions = await fb.get(`rooms/${roomCode}/questions`) || questions;
+  currentQ=0;
+  showHostQ(0);
+}
+
+// ════════════════════════════════════════════════════════════════
+// HOST QUESTION
+// ════════════════════════════════════════════════════════════════
+function showHostQ(idx) {
+  gamePhase='question'; currentQ=idx;
+  const q=questions[idx];
+  _cachedAnswers={};
+
+  fb.set(`rooms/${roomCode}/answers`, {});
+  showScreen('host-q');
+  document.getElementById('hq-num').textContent   = `Q ${idx+1} / ${questions.length}`;
+  document.getElementById('hq-text').textContent  = q.question;
+  document.getElementById('hq-reveal').style.display = 'none';
+  document.getElementById('hq-next').style.display   = 'none';
+  document.getElementById('hq-count').textContent    = '';
+
+  const L=['A','B','C','D'];
+  document.getElementById('hq-opts').innerHTML = q.options.map((o,i)=>
+    `<button class="opt" disabled><span class="opt-letter">${L[i]}</span>${esc(o)}</button>`
+  ).join('');
+
+  // Watch answers live
+  _answersSSE = fb.listen(`rooms/${roomCode}/answers`, data => {
+    if (data) _cachedAnswers=data;
+  });
+
+  // Start timer — get player count first
+  fb.get(`rooms/${roomCode}/players`).then(players => {
+    const pCount = Object.values(players||{}).filter(p=>!p.isHost).length;
+    clearInterval(timerInterval);
+    timeLeft=gameSettings.timePerQ;
+    const total=timeLeft;
+    const tEl=document.getElementById('hq-timer'), pEl=document.getElementById('hq-pfill');
+    tEl.textContent=timeLeft; tEl.classList.remove('hot'); pEl.style.width='100%';
+
+    timerInterval = setInterval(async()=>{
+      timeLeft--;
+      tEl.textContent=timeLeft;
+      pEl.style.width=`${(timeLeft/total)*100}%`;
+      if(timeLeft<=5) tEl.classList.add('hot');
+      const ac=Object.keys(_cachedAnswers).length;
+      document.getElementById('hq-count').textContent=`${ac} / ${pCount} answered`;
+      if(timeLeft<=0 || ac>=pCount){ clearInterval(timerInterval); hostReveal(q, pCount); }
+    }, 1000);
+  });
+}
+
+async function hostReveal(q, pCount) {
+  if(_answersSSE){ try{_answersSSE.close()}catch{} _answersSSE=null; }
+  const answers = await fb.get(`rooms/${roomCode}/answers`) || _cachedAnswers;
+  const curScores = await fb.get(`rooms/${roomCode}/scores`) || {};
+
+  document.getElementById('hq-opts').querySelectorAll('.opt').forEach((b,i)=>{
+    if(i===q.correctIndex) b.classList.add('correct');
+  });
+
+  let correct=0;
+  const newScores={...curScores};
+  Object.entries(answers).forEach(([k,{answer,time}])=>{
+    if(answer===q.correctIndex){
+      const pts=Math.max(100, Math.round(500*(time/gameSettings.timePerQ)));
+      newScores[k]=(newScores[k]||0)+pts;
+      correct++;
+    }
+  });
+  await fb.set(`rooms/${roomCode}/scores`, newScores);
+
+  document.getElementById('hq-reveal').style.display='block';
+  document.getElementById('hq-reveal').innerHTML=
+    `Correct: <strong>${esc(q.options[q.correctIndex])}</strong> &nbsp;·&nbsp; ${correct}/${pCount} right`;
+  document.getElementById('hq-next').style.display='block';
+  document.getElementById('hq-count').textContent=`${Object.keys(answers).length} / ${pCount} answered`;
+  await fb.patch(`rooms/${roomCode}/settings`, {phase:'reveal'});
+}
+
+async function hostNext() {
+  const next=currentQ+1;
+  if(next>=questions.length){
+    await fb.patch(`rooms/${roomCode}/settings`,{phase:'final'});
+    showFinal(true);
+  } else {
+    _nextQIdx=next;
+    await fb.patch(`rooms/${roomCode}/settings`,{phase:'scoreboard'});
+    await showSB(true, next);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// PLAYER QUESTION
+// ════════════════════════════════════════════════════════════════
+function showPlayerQ(idx) {
+  gamePhase='question'; currentQ=idx;
+  hasAnswered=false; myAnswer=null;
+  const q=questions[idx];
+  if(!q){ setTimeout(()=>showPlayerQ(idx),500); return; }
+
+  showScreen('player-q');
+  document.getElementById('pq-num').textContent  = `Q ${idx+1} / ${gameSettings.numQuestions}`;
+  document.getElementById('pq-text').textContent = q.question;
+  document.getElementById('pq-fb').style.display='none';
+
+  const L=['A','B','C','D'];
+  document.getElementById('pq-opts').innerHTML = q.options.map((o,i)=>
+    `<button class="opt" onclick="playerAnswer(${i})"><span class="opt-letter">${L[i]}</span>${esc(o)}</button>`
+  ).join('');
+
+  clearInterval(timerInterval);
+  timeLeft=gameSettings.timePerQ;
+  const total=timeLeft;
+  const tEl=document.getElementById('pq-timer'), pEl=document.getElementById('pq-pfill');
+  tEl.textContent=timeLeft; tEl.classList.remove('hot'); pEl.style.width='100%';
+
+  timerInterval=setInterval(()=>{
+    timeLeft--;
+    tEl.textContent=timeLeft;
+    pEl.style.width=`${(timeLeft/total)*100}%`;
+    if(timeLeft<=5) tEl.classList.add('hot');
+    if(timeLeft<=0){
+      clearInterval(timerInterval);
+      if(!hasAnswered){
+        setFb('pq-fb','timeout-fb',"⏰ Time's up!");
+        disableOpts('pq-opts');
+      }
+    }
+  },1000);
+
+  listenForGameState();
+}
+
+async function playerAnswer(idx) {
+  if(hasAnswered) return;
+  hasAnswered=true; myAnswer=idx;
+  clearInterval(timerInterval);
+  await fb.patch(`rooms/${roomCode}/answers`,{[key(myName)]:{answer:idx,time:timeLeft}});
+  disableOpts('pq-opts');
+  document.getElementById('pq-opts').querySelectorAll('.opt')[idx].classList.add('picked');
+  setFb('pq-fb','fb-wait','✅ Locked in! Waiting for results…');
+}
+
+function revealPlayer() {
+  clearInterval(timerInterval);
+  gamePhase='reveal';
+  const q=questions[currentQ];
+  disableOpts('pq-opts');
+  document.getElementById('pq-opts').querySelectorAll('.opt').forEach((b,i)=>{
+    if(i===q.correctIndex) b.classList.add('correct');
+    else if(i===myAnswer)  b.classList.add('wrong');
+  });
+  if(!hasAnswered)           setFb('pq-fb','fb-timeout',`⏰ Time's up! Answer: ${q.options[q.correctIndex]}`);
+  else if(myAnswer===q.correctIndex) setFb('pq-fb','fb-ok','🎉 Correct!');
+  else                       setFb('pq-fb','fb-bad',`❌ Wrong! Answer: ${q.options[q.correctIndex]}`);
+}
+
+function setFb(id, cls, text){
+  const el=document.getElementById(id);
+  el.style.display='block'; el.className='feedback '+cls; el.textContent=text;
+}
+
+// ════════════════════════════════════════════════════════════════
+// SCOREBOARD
+// ════════════════════════════════════════════════════════════════
+async function showSB(isHost, nextIdx) {
+  gamePhase='scoreboard';
+  const rawScores = await fb.get(`rooms/${roomCode}/scores`) || {};
+  const players   = await fb.get(`rooms/${roomCode}/players`) || {};
+  const nameMap={};
+  Object.values(players).forEach(p=>nameMap[key(p.name)]=p.name);
+  const sorted=Object.entries(rawScores)
+    .map(([k,pts])=>({name:nameMap[k]||k,pts}))
+    .sort((a,b)=>b.pts-a.pts);
+
+  showScreen('sb-screen');
+  document.getElementById('sb-title').textContent=`After Q${currentQ+1}`;
+  document.getElementById('sb-sub').textContent='Quick look before the next question…';
+  renderRows('sb-rows',sorted);
+  document.getElementById('sb-host-ctrl').style.display=isHost?'block':'none';
+  document.getElementById('sb-wait').style.display=isHost?'none':'block';
+  if(isHost) _nextQIdx=nextIdx;
+}
+
+async function sbContinue() {
+  await fb.patch(`rooms/${roomCode}/settings`,{phase:'question',currentQ:_nextQIdx});
+  showHostQ(_nextQIdx);
+}
+
+// ════════════════════════════════════════════════════════════════
+// FINAL
+// ════════════════════════════════════════════════════════════════
+async function showFinal(isHost) {
+  gamePhase='final'; stopSSE(); clearInterval(timerInterval);
+  const rawScores=await fb.get(`rooms/${roomCode}/scores`)||{};
+  const players=await fb.get(`rooms/${roomCode}/players`)||{};
+  const nameMap={};
+  Object.values(players).forEach(p=>nameMap[key(p.name)]=p.name);
+  const sorted=Object.entries(rawScores)
+    .map(([k,pts])=>({name:nameMap[k]||k,pts}))
+    .sort((a,b)=>b.pts-a.pts);
+  const winner=sorted[0]?.name;
+
+  showScreen('final-screen');
+  document.getElementById('fin-emoji').textContent=winner===myName?'🏆':'🎉';
+  document.getElementById('fin-title').textContent=winner===myName?'You won!':`${esc(winner)} wins!`;
+  document.getElementById('fin-msg').textContent=`Thanks for playing "${gameSettings.topic}"!`;
+  renderRows('fin-rows',sorted);
+  if(isHost) setTimeout(()=>fb.del(`rooms/${roomCode}`),300000);
+}
+
+function renderRows(id,sorted){
+  const medals=['🥇','🥈','🥉'], rc=['g','s','b'];
+  document.getElementById(id).innerHTML=sorted.map(({name,pts},i)=>`
+    <div class="s-row${name===myName?' me':''}">
+      <span class="s-rank${rc[i]?' '+rc[i]:''}">${medals[i]||'#'+(i+1)}</span>
+      <span class="s-name">${esc(name)}${name===myName?' <span style="color:var(--muted);font-size:.78rem">(you)</span>':''}</span>
+      <span class="s-pts">${pts} pts</span>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════════
+// AI QUESTIONS
+// ════════════════════════════════════════════════════════════════
+async function generateQuestions(topic, count) {
+  const r=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens:2000,
+      messages:[{role:'user',content:
+        `Generate ${count} multiple-choice quiz questions about: "${topic}".
+Return ONLY a raw JSON array — no markdown, no code fences, no preamble.
+Each element: {"question":"...","options":["A","B","C","D"],"correctIndex":0}
+correctIndex is 0–3. Vary difficulty. Make distractors plausible.`}]
+    })
+  });
+  const d=await r.json();
+  const txt=d.content?.[0]?.text||'[]';
+  return JSON.parse(txt.replace(/```json|```/g,'').trim());
+}
+
+// ════════════════════════════════════════════════════════════════
+// QR CODE
+// ════════════════════════════════════════════════════════════════
+function generateQR(url) {
+  const canvas = document.getElementById('qr-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 140, 140);
+  // Use QRCode library to draw onto a temp div, then copy to canvas
+  const tmp = document.createElement('div');
+  new QRCode(tmp, {
+    text: url,
+    width: 140,
+    height: 140,
+    colorDark: '#0D0F1C',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  // QRCode renders a canvas inside tmp — copy it
+  setTimeout(() => {
+    const src = tmp.querySelector('canvas');
+    if (src) ctx.drawImage(src, 0, 0);
+  }, 100);
+}
+
+// ════════════════════════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════════════════════════
+(function boot(){
+  if(DB){ init(); } else { showScreen('config-screen'); }
+})();
+
+function init(){
+  showScreen('landing');
+  const params=new URLSearchParams(location.search);
+  const code=params.get('join');
+  if(code){
+    showScreen('join-screen');
+    document.getElementById('join-code').value=code;
+  }
+}
+</script>
+</body>
+</html>
